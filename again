@@ -12,13 +12,46 @@ COMMANDS = {
     "git help": "This command prints the help for all git subcommands.",
     "git create": "Takes in name, public/not, description, and creates the repo for you. \033[1;35mNOTE:\033[0m This uses 'gh' command line tool.",
     "git push": "Automates 'git add', 'git commit', 'git push'. Takes in commit message and set upstream/not.",
-    "git setup": "Automates starting files. Takes in language for .gitignore, repo name for README.md"
+    "git setup": "Automates starting files. Takes in language for .gitignore, repo name for README.md",
+    "python": "The main command for python stuff",
+    "python help": "Prints python help message",
+    "python clean": "Deletes __pycache__/ directory"
 }
 
 def print_help() -> None:
     print("Available commands are:")
     for cmd in COMMANDS:
         print(f"{cmd}:\t\t{COMMANDS[cmd]}")
+
+
+def python_help(cmd: str | None = None) -> int:
+    if not cmd:
+        print("\thelp:\t\tPrints this help")
+        print("\tclean:\t\tDeletes the python-generated `__pycache__` directory")
+
+    else:
+        if "python " + cmd in COMMANDS:
+            if cmd == "help":
+                print("I know you know how to use help. Look at you doing it now!")
+                
+            elif cmd == "clean":
+                print("Arguments:\n\t\tNone")
+                print("Syntax (example):\n\t\tpython clean")
+
+            else:
+                print(f"No such subcommand or help not implemented: {cmd}")
+                return 1
+
+    return 0
+
+
+def python_clean() -> int:
+    result = sub.run(["rm", "-rf", "__pycache__"], stdout=DEVNULL)
+
+    if result.returncode != 0:
+        return 1
+    else:
+        return 0
 
 
 def git_help(cmd: str = None) -> int:
@@ -226,6 +259,20 @@ def dispatch(cmd_unsplit: str) -> int:
 
         elif cmd[0] == "exit":
             return 10
+
+        elif cmd[0] == "python":
+            if cmd[1] == "help":
+                if len(cmd) > 2:
+                    return python_help(cmd[2])
+                else:
+                    return python_help()
+            
+            elif cmd[1] == "clean":
+                return python_clean()
+
+            else:
+                print("Invalid subcommand for python: '%s'" % cmd[1])
+                return 1
     
         else:
             print(f"Sorry! '{cmd[0]}' command isn't supported as of now.")
