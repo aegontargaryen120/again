@@ -1,126 +1,200 @@
 #!/opt/homebrew/bin/python3.15
-from subprocess import call
-from pathlib import Path
-import shutil
-import subprocess
+lazy import subprocess as sub
+lazy from subprocess import DEVNULL
+lazy from pathlib import Path
+lazy import shutil
 
-"""
-`again` is an interactive tool for automating needless command-line tasks.
-"""
+COMMANDS = {
+    "git": "The main command for git stuff.",
+    "git help": "This command prints the help for all git subcommands.",
+    "git create": "Takes in name, public/not, description, and creates the repo for you. \033[1;35mNOTE:\033[0m This uses 'gh' command line tool.",
+    "git push": "Automates 'git add', 'git commit', 'git push'. Takes in commit message and set upstream/not.",
+    "git setup": "Automates starting files. Takes in language for .gitignore, repo name for README.md"
+}
 
-def git_setup(source: list[str]) -> None:
-    print("\n[INFO] Running git setup process...")
-    
-    print("[CMD] touch .gitignore")
-    call(["touch", ".gitignore"])
-    
-    print("[CMD] touch .gitattributes")
-    call(["touch", ".gitattributes"])
-    
-    print("[INFO] Writing .gitattributes")
-    with open('.gitattributes', "a", encoding="utf-8") as f:
-        f.write("* text eol=lf\n")
-        f.write(".* text eol=lf\n")
-        f.write("*.* text eol=lf\n")
-
-    print("[CMD] touch README.md")
-    call(["touch", "README.md"])
-
-    print("[INFO] Writing README.md")
-    with open('README.md', 'a', encoding='utf-8') as f:
-        f.write("# \n")
-
-    print("[CMD] cp ~/code/LICENSE.txt ./")
-    shutil.copy(Path.home() / "code" / "LICENSE.txt", ".")
-
-    print("[INFO] Git setup done!")
+def print_help() -> None:
+    print("Available commands are:")
+    for cmd in COMMANDS:
+        print(f"{cmd}:\t\t{COMMANDS[cmd]}")
 
 
-def git_push(upstream: bool, message: str):
-    print("[INFO] Pushing source code...")
+def git_help(cmd: str = None) -> None:
+    if not cmd:
+        print("\thelp:\t\tPrints this help.")
+        print("\tcreate:\t\tTakes in name, public/not, description, and creates the repo for you.\033[1;35mNOTE:\033[0m This uses 'hg' command line tool.")
+        print("\tpush:\t\tTakes in commit message and upstream/not automatically pushes source code to the repo.")  
+        print("\tsetup:\t\tTakes in language for .gitignore, name for README.md and writes all starting files.")
 
-    print("[CMD] git add .")
-    call(["git", "add", "."])
-
-    print(f'[CMD] git commit -m "{message}"')
-    call(['git', 'commit', '-m', message])
-
-    if upstream:
-        print("[CMD] git push -u origin main")
-        call(["git", "push", "-u", "origin", "main"])
     else:
-        print("[CMD] git push")
-        call(["git", "push"])
+        if "git " + cmd in COMMANDS:
+            if cmd == "create":
+                print("Arguments:")
+                print("\tName:\t\tName of repo")
+                print("\tPublic:\t\tDecides if creating private repo, or public repo.")
+                print("\tDescription:\t\tAdds description of repo.")
+                print("")
+                print("Syntax (example):")
+                print("\tgit create repo_name, [ public / private ], Description of the repo")
 
-    print("[INFO] Source code is in repo!")
+            elif cmd == "push":
+                print("Arguments:")
+                print("\tSet upstream:\t\tDecides whether to uses -u or not")
+                print("\tCommit Message:\t\tSets the commit message")
+                print("")
+                print("Syntax (example):")
+                print("\tgit push [ upstream / set ], Commit message")
+
+            elif cmd == "setup":
+                print("Arguments:")
+                print("\tLanguage:\t\tSets language for .gitignore template")
+                print("\tRepo Name:\t\tBasic README template.")
+                print("")
+                print("Syntax (example):")
+                print("\tgit setup [ python / cxx ], REPO_NAME")
+
+            elif cmd == "help":
+                print("Nice try. You know how to use help!")
+
+            else:
+                print(f"No such subcommand or help not implemented: {cmd}")
+
+        else:
+            print(f"No such subcommand: {cmd}")
 
 
-def git_create(name: str, public: bool, description: str) -> None:
-    print("[INFO] Creating github repo...")
-
-    command = ["gh", "repo", "create", "name", "--description", description]
+def git_create(name: str, public: bool, description: str) -> int:
+    command = ["gh", "repo", "create", name]
 
     if public:
         command.append("--public")
     else:
         command.append("--private")
 
-    call(command)
-
-
-def dispatch(source: list[str]) -> None:
-    if source[0] == "git":
-        if source[1] == "setup":
-            git_setup(source[2:-1])
-        
-        elif source[1] == "push":
-            if source[2] != "-u":
-                commit_message = " ".join(source[3:-1])
-                git_push(False, commit_message)
-
-            else:
-                commit_message = " ".join(source[3:-1])
-                git_push(True, commit_message)
-
-        elif source[1] == "create":
-            name = source[2]
-
-            if source[3] == "public":
-                public = True
-            else:
-                public = False
-
-            description = " ".join(source[4:-1])
-            git_create(name, public, description)
-
-        else:
-            print("\033[1;31mUnrecognised Git Subcommand:\033[0m '%s'" % source[1])
-
+    if description:
+        command.append("--description")
+        command.append(description)
     else:
-        print("\033[1;31mUnrecognised Command:\033[0m '%s'" % source[0])
+        print("\033[1;31mERROR:\033[0m\tCommand requires description!")
+        return 1
+
+    result = sub.run(
+        command,
+        stdout=DEVNULL,
+        stderr=DEVNULL
+    )
+
+    if result.returncode == 0:
+        return 0
+    else:
+        print("Command failed!")
+        return 1
+
+    return 0
 
 
-def main() -> None:
-    while True:
-        prompt = input(">> ")
+def git_push(message: str, upstream: bool) -> int:
+    add = sub.run(["git", "add", "."], stdout=DEVNULL, stderr=DEVNULL)
+    if add.returncode != 0:
+        print("Staging failed!")
+        return 1
 
-        if prompt == "exit":
-            break
+    commit = ["git", "commit"]
+    if message:
+        commit.append("-m")
+        commit.append(message)
+    else:
+        print("Command requires commit message!")
+        return 1
+    commit_cmd = sub.run(commit, stdout=DEVNULL, stderr=DEVNULL)
+    if commit_cmd.returncode != 0:
+        print("Commit failed!")
+        return 1
 
-        if not prompt:
-            continue
+    push = ["git", "push"]
+    if upstream:
+        push.append("-u")
+        push.append("origin")
+        push.append("main")
+    else:
+        pass
+    push_cmd = sub.run(push, stdout=DEVNULL, stderr=DEVNULL)
+    if push_cmd.returncode != 0:
+        print("Push failed!")
+        return 1
+    
+    return 0
 
-        source = prompt.split()
 
-        if source[0] == "git":
-            if len(source) >= 3:
-                dispatch(source)
+def git_setup(lang: str, name: str) -> int:
+    result = sub.run(["touch", "README.md", ".gitignore", ".gitattributes"])
+    if result.returncode != 0:
+        print("File creation failed!")
+        return 1
+
+    if name:
+        with open("README.md", "w") as f:
+            f.write(f"# {name}\n")
+    else:
+        print("Command requires name!")
+        return 1
+
+    if lang:
+        with open(".gitignore", "w") as f:
+            if lang == "python":
+                f.write("# python gitignore\n")
+                f.write("*.pyc\n")
+                f.write("**/*.pyc\n")
+                f.write("__pycache__/*\n")
+                f.write("**/__pycache__/*\n")
+                f.write("__pycache__/\n")
+                f.write("**/__pycache__/\n")
+            elif lang == "cxx":
+                f.write("# c/c++ gitignore\n")
+                f.write("*.bin\n")
+                f.write("*.o\n")
             else:
-                print("Sorry! You must provide all necessary git subcommands!")
+                print(f"Sorry! {lang} is not supported as of now!")
+                return 1
+    else:
+        print("Command requires lang!")
+        return 1
 
-        dispatch(source)
+    with open(".gitattributes", "w") as f:
+        f.write("*.* text eol=lf\n")
+
+    shutil.copy(Path("~") / "code" / "LICENSE.txt", "./")
+
+    return 0
 
 
-if __name__ == "__main__":
-    main()
+def dispatch(cmd_unsplit: str) -> None:
+    cmd = cmd_unsplit.split()
+
+    try:
+        if cmd[0] == "git":
+            if cmd[1] == "help":
+                if cmd[2]:
+                    git_help(cmd[2])
+                else:
+                    git_help()
+        
+            elif cmd[1] == "create":
+                name = cmd[2]
+                public = True
+        
+                if cmd[3] == "public":
+                    public = True
+                elif cmd[3] == "private":
+                    public = False
+                else:
+                    print("Invalid command for public!")
+    
+                description = " ".join(cmd[3:len(cmd)])
+                git_create(name, public, description)
+    
+        else:
+            print(f"Sorry! '{cmd[0]}' command isn't supported as of now.")
+
+    except Exception:
+        print("Please enter the full command or enter a valid command.")
 
