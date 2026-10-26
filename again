@@ -1,8 +1,11 @@
 #!/opt/homebrew/bin/python3.15
-lazy import subprocess as sub
-lazy from subprocess import DEVNULL
-lazy from pathlib import Path
-lazy import shutil
+import subprocess as sub
+from subprocess import DEVNULL
+from pathlib import Path
+import shutil
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from name import name as dir_name
 
 COMMANDS = {
     "git": "The main command for git stuff.",
@@ -18,12 +21,14 @@ def print_help() -> None:
         print(f"{cmd}:\t\t{COMMANDS[cmd]}")
 
 
-def git_help(cmd: str = None) -> None:
+def git_help(cmd: str = None) -> int:
     if not cmd:
         print("\thelp:\t\tPrints this help.")
-        print("\tcreate:\t\tTakes in name, public/not, description, and creates the repo for you.\033[1;35mNOTE:\033[0m This uses 'hg' command line tool.")
+        print("\tcreate:\t\tTakes in name, public/not, description, and creates the repo for you.\033[1;35mNOTE:\033[0m This uses 'gh' command line tool.")
         print("\tpush:\t\tTakes in commit message and upstream/not automatically pushes source code to the repo.")  
         print("\tsetup:\t\tTakes in language for .gitignore, name for README.md and writes all starting files.")
+
+        return 0
 
     else:
         if "git " + cmd in COMMANDS:
@@ -34,7 +39,7 @@ def git_help(cmd: str = None) -> None:
                 print("\tDescription:\t\tAdds description of repo.")
                 print("")
                 print("Syntax (example):")
-                print("\tgit create repo_name, [ public / private ], Description of the repo")
+                print("\tgit create repo_name [ public / private ] Description of the repo")
 
             elif cmd == "push":
                 print("Arguments:")
@@ -42,7 +47,7 @@ def git_help(cmd: str = None) -> None:
                 print("\tCommit Message:\t\tSets the commit message")
                 print("")
                 print("Syntax (example):")
-                print("\tgit push [ upstream / set ], Commit message")
+                print("\tgit push [ upstream / set ] Commit message")
 
             elif cmd == "setup":
                 print("Arguments:")
@@ -50,16 +55,20 @@ def git_help(cmd: str = None) -> None:
                 print("\tRepo Name:\t\tBasic README template.")
                 print("")
                 print("Syntax (example):")
-                print("\tgit setup [ python / cxx ], REPO_NAME")
+                print("\tgit setup [ python / cxx ] REPO_NAME")
 
             elif cmd == "help":
                 print("Nice try. You know how to use help!")
 
             else:
                 print(f"No such subcommand or help not implemented: {cmd}")
+                return 1
 
         else:
             print(f"No such subcommand: {cmd}")
+            return 1
+
+    return 0
 
 
 def git_create(name: str, public: bool, description: str) -> int:
@@ -79,23 +88,20 @@ def git_create(name: str, public: bool, description: str) -> int:
 
     result = sub.run(
         command,
-        stdout=DEVNULL,
-        stderr=DEVNULL
+        stdout=DEVNULL
     )
 
     if result.returncode == 0:
         return 0
     else:
-        print("Command failed!")
         return 1
 
     return 0
 
 
 def git_push(message: str, upstream: bool) -> int:
-    add = sub.run(["git", "add", "."], stdout=DEVNULL, stderr=DEVNULL)
+    add = sub.run(["git", "add", "."], stdout=DEVNULL)
     if add.returncode != 0:
-        print("Staging failed!")
         return 1
 
     commit = ["git", "commit"]
@@ -105,30 +111,27 @@ def git_push(message: str, upstream: bool) -> int:
     else:
         print("Command requires commit message!")
         return 1
-    commit_cmd = sub.run(commit, stdout=DEVNULL, stderr=DEVNULL)
+    commit_cmd = sub.run(commit, stdout=DEVNULL)
     if commit_cmd.returncode != 0:
-        print("Commit failed!")
         return 1
 
     push = ["git", "push"]
-    if upstream:
+    if upstream == False:
         push.append("-u")
         push.append("origin")
         push.append("main")
     else:
         pass
-    push_cmd = sub.run(push, stdout=DEVNULL, stderr=DEVNULL)
+    push_cmd = sub.run(push, stdout=DEVNULL)
     if push_cmd.returncode != 0:
-        print("Push failed!")
         return 1
     
     return 0
 
 
 def git_setup(lang: str, name: str) -> int:
-    result = sub.run(["touch", "README.md", ".gitignore", ".gitattributes"])
+    result = sub.run(["touch", "README.md", ".gitignore", ".gitattributes"], stdout=DEVNULL)
     if result.returncode != 0:
-        print("File creation failed!")
         return 1
 
     if name:
@@ -162,21 +165,21 @@ def git_setup(lang: str, name: str) -> int:
     with open(".gitattributes", "w") as f:
         f.write("*.* text eol=lf\n")
 
-    shutil.copy(Path("~") / "code" / "LICENSE.txt", "./")
+    shutil.copy(Path("/Users") / dir_name / "code" / "LICENSE.txt", "./")
 
     return 0
 
 
-def dispatch(cmd_unsplit: str) -> None:
+def dispatch(cmd_unsplit: str) -> int:
     cmd = cmd_unsplit.split()
 
     try:
         if cmd[0] == "git":
             if cmd[1] == "help":
-                if cmd[2]:
-                    git_help(cmd[2])
+                if len(cmd) > 2:
+                    return git_help(cmd[2])
                 else:
-                    git_help()
+                    return git_help()
         
             elif cmd[1] == "create":
                 name = cmd[2]
@@ -187,14 +190,64 @@ def dispatch(cmd_unsplit: str) -> None:
                 elif cmd[3] == "private":
                     public = False
                 else:
-                    print("Invalid command for public!")
-    
-                description = " ".join(cmd[3:len(cmd)])
-                git_create(name, public, description)
+                    print("Invalid command for public")
+                    return 1
+                    
+                description = " ".join(cmd[4:len(cmd)])
+                return git_create(name, public, description)
+
+            elif cmd[1] == "push":
+                upstream = True
+                if cmd[2] == "upstream":
+                    upstream = True
+                elif cmd[2] == "set":
+                    upstream = False
+                else:
+                    print("Invalid command for upstream")
+                    return 1
+
+                message = ' '.join(cmd[3:len(cmd)])
+
+                return git_push(message, upstream)
+
+            elif cmd[1] == "setup":
+                lang = cmd[2]
+                name = cmd[3]
+
+                return git_setup(lang, name)
+
+            else:
+                print("Invalid subcommand for git: '%s'" % cmd[1])
+                return 1
+
+        elif cmd[0] == "help":
+            print_help()
+            return 0
+
+        elif cmd[0] == "exit":
+            return 10
     
         else:
             print(f"Sorry! '{cmd[0]}' command isn't supported as of now.")
+            return 1
 
-    except Exception:
-        print("Please enter the full command or enter a valid command.")
+    except IndexError:
+        print("Empty command.")
+        return 1
+
+
+def main() -> None:
+    while True:
+        cmd_unsplit = input(">> ").strip()
+        exit_code = dispatch(cmd_unsplit)
+
+        if exit_code == 0 or exit_code == 1:
+            continue
+        else:
+            break
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
 
