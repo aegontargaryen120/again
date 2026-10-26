@@ -1,0 +1,126 @@
+#!/opt/homebrew/bin/python3.15
+from subprocess import call
+from pathlib import Path
+import shutil
+import subprocess
+
+"""
+`again` is an interactive tool for automating needless command-line tasks.
+"""
+
+def git_setup(source: list[str]) -> None:
+    print("\n[INFO] Running git setup process...")
+    
+    print("[CMD] touch .gitignore")
+    call(["touch", ".gitignore"])
+    
+    print("[CMD] touch .gitattributes")
+    call(["touch", ".gitattributes"])
+    
+    print("[INFO] Writing .gitattributes")
+    with open('.gitattributes', "a", encoding="utf-8") as f:
+        f.write("* text eol=lf\n")
+        f.write(".* text eol=lf\n")
+        f.write("*.* text eol=lf\n")
+
+    print("[CMD] touch README.md")
+    call(["touch", "README.md"])
+
+    print("[INFO] Writing README.md")
+    with open('README.md', 'a', encoding='utf-8') as f:
+        f.write("# \n")
+
+    print("[CMD] cp ~/code/LICENSE.txt ./")
+    shutil.copy(Path.home() / "code" / "LICENSE.txt", ".")
+
+    print("[INFO] Git setup done!")
+
+
+def git_push(upstream: bool, message: str):
+    print("[INFO] Pushing source code...")
+
+    print("[CMD] git add .")
+    call(["git", "add", "."])
+
+    print(f'[CMD] git commit -m "{message}"')
+    call(['git', 'commit', '-m', message])
+
+    if upstream:
+        print("[CMD] git push -u origin main")
+        call(["git", "push", "-u", "origin", "main"])
+    else:
+        print("[CMD] git push")
+        call(["git", "push"])
+
+    print("[INFO] Source code is in repo!")
+
+
+def git_create(name: str, public: bool, description: str) -> None:
+    print("[INFO] Creating github repo...")
+
+    command = ["gh", "repo", "create", "name", "--description", description]
+
+    if public:
+        command.append("--public")
+    else:
+        command.append("--private")
+
+    call(command)
+
+
+def dispatch(source: list[str]) -> None:
+    if source[0] == "git":
+        if source[1] == "setup":
+            git_setup(source[2:-1])
+        
+        elif source[1] == "push":
+            if source[2] != "-u":
+                commit_message = " ".join(source[3:-1])
+                git_push(False, commit_message)
+
+            else:
+                commit_message = " ".join(source[3:-1])
+                git_push(True, commit_message)
+
+        elif source[1] == "create":
+            name = source[2]
+
+            if source[3] == "public":
+                public = True
+            else:
+                public = False
+
+            description = " ".join(source[4:-1])
+            git_create(name, public, description)
+
+        else:
+            print("\033[1;31mUnrecognised Git Subcommand:\033[0m '%s'" % source[1])
+
+    else:
+        print("\033[1;31mUnrecognised Command:\033[0m '%s'" % source[0])
+
+
+def main() -> None:
+    while True:
+        prompt = input(">> ")
+
+        if prompt == "exit":
+            break
+
+        if not prompt:
+            continue
+
+        source = prompt.split()
+
+        if source[0] == "git":
+            if len(source) >= 3:
+                dispatch(source)
+            else:
+                print("Sorry! You must provide all necessary git subcommands!")
+
+        dispatch(source)
+
+
+if __name__ == "__main__":
+    main()
+
