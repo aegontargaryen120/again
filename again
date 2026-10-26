@@ -105,7 +105,7 @@ def git_help(cmd: str = None) -> int:
 
 
 def git_create(name: str, public: bool, description: str) -> int:
-    command = ["gh", "repo", "create", name]
+    command = ["gh", "repo", "create", name, "--clone"]
 
     if public:
         command.append("--public")
