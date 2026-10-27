@@ -15,7 +15,8 @@ COMMANDS = {
     "git setup": "Automates starting files. Takes in language for .gitignore, repo name for README.md",
     "python": "The main command for python stuff",
     "python help": "Prints python help message",
-    "python clean": "Deletes __pycache__/ directory"
+    "python clean": "Deletes __pycache__/ directory",
+    "git clone": "Takes in owner and repo name and clones the repo locally. \033[1;35mNOTE:\033[0m This uses the 'gh' command line tool."
 }
 
 def print_help() -> None:
@@ -60,6 +61,7 @@ def git_help(cmd: str = None) -> int:
         print("\tcreate:\t\tTakes in name, public/not, description, and creates the repo for you.\033[1;35mNOTE:\033[0m This uses 'gh' command line tool.")
         print("\tpush:\t\tTakes in commit message and upstream/not automatically pushes source code to the repo.")  
         print("\tsetup:\t\tTakes in language for .gitignore, name for README.md and writes all starting files.")
+        print("\tclone:\t\tTakes in owner and repo name and clones the repo locally. \033[1;35mNOTE:\033[0m This uses the 'gh' command line tool.")
 
         return 0
 
@@ -92,6 +94,14 @@ def git_help(cmd: str = None) -> int:
 
             elif cmd == "help":
                 print("Nice try. You know how to use help!")
+
+            elif cmd == "clone":
+                print("Arguments:")
+                print("\tOwner:\t\tThe owner of the repo")
+                print("\tRepo name:\t\tThe github address of the repo")
+                print("")
+                print("Syntax (example):")
+                print("\tgit clone aegontargaryen120 again")
 
             else:
                 print(f"No such subcommand or help not implemented: {cmd}")
@@ -203,6 +213,15 @@ def git_setup(lang: str, name: str) -> int:
     return 0
 
 
+def git_clone(owner: str, name: str) -> int:
+    result = sub.run(["gh", "repo", "clone", f"{owner}/{name}"])
+
+    if result.returncode != 0:
+        return 1
+    else:
+        return 0
+
+
 def dispatch(cmd_unsplit: str) -> int:
     cmd = cmd_unsplit.split()
 
@@ -248,6 +267,12 @@ def dispatch(cmd_unsplit: str) -> int:
                 name = cmd[3]
 
                 return git_setup(lang, name)
+
+            elif cmd[1] == "clone":
+                owner = cmd[2]
+                name = cmd[3]
+
+                return git_clone(owner, name)
 
             else:
                 print("Invalid subcommand for git: '%s'" % cmd[1])
