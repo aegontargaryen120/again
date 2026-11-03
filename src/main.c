@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 typedef enum {
   DIRECTIVE_ERR,
@@ -12,6 +12,7 @@ typedef enum {
   DIRECTIVE_VERSION,
   DIRECTIVE_RUN,
   DIRECTIVE_BUILD,
+  DIRECTIVE_CLEAN,
 } Directive;
 
 typedef struct {
@@ -19,6 +20,7 @@ typedef struct {
   union {
     const char *filename;
     const char *error;
+    bool all;
   } data;
 } Argument;
 
@@ -29,7 +31,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.2\nA tool for automating needless tasks, running shell commands, and writing build recipies\nOpen Source Software\n"
+#define VERSION_INFO "again v0.3\nA tool for building CXX projects and running shell commands.\nThis is Open Source Software\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -60,6 +62,11 @@ const char *get_flag(const char *flag) {
     return "build";
   }
 
+  if (strcmp(flag, "-c") == 0 ||
+      strcmp(flag, "--clean") == 0) {
+    return "clean";
+  }
+
   return NULL;
 }
 
@@ -71,7 +78,8 @@ void help(const char *message, FILE *stream) {
   print("     -h, --help          -> Prints this help to the terminal\n");
   print("     -v, --version       -> Prints the version information to the terminal\n");
   print("     -r, --run           -> Runs the next argument as a shell cmd file\n");
-  print("     -b, --build         -> Builds the entire directory as a CXX project\n");
+  print("     -b, --build         -> Builds the entire directory as a CXX project. NOTE: `build` directory must exist\n");
+  print("     -c, --clean         -> Cleans out the build folder. NOTE: `build` directory must exist\n");
   print("\n");
 
   if (message != NULL && *message != '\0') {
@@ -146,6 +154,22 @@ Argument parse_args(int argc, char **argv) {
 	.data.filename = target
       };
     }
+
+    if (strcmp(flag, "clean") == 0) {
+      if (argc >= i + 1) {
+	if (strcmp(argv[i + 1], "--all") == 0) {
+	  return (Argument) {
+	    .directive = DIRECTIVE_CLEAN,
+	    .data.all = true
+	  };
+	} else {
+	  return (Argument) {
+	    .directive = DIRECTIVE_CLEAN,
+	    .data.filename = argv[++i]
+	  };
+	}
+      }
+    }
   }
     
   return makeError("No valid directive provided.");
@@ -191,7 +215,7 @@ int run_file(const char *filename) {
 int build(const char *target) {
   char command[512];
 
-  snprintf(command, sizeof(command), "clang -Wall -Wextra -o %s *.c", target);
+  snprintf(command, sizeof(command), "clang -Wall -Wextra -o build/%s *.c", target);
 
   printf("Building C project...\n");
   printf("-*-Cmd:-*-\t%s\n", command);
@@ -203,6 +227,31 @@ int build(const char *target) {
     return 0;
   } else {
     fprintf(stderr, "ERROR: Compilation failed.\n");
+    return 1;
+  }
+
+  return 1;
+}
+
+int clean(bool all, const char *filename) {
+  char command[512];
+
+  if (!all) {
+    snprintf(command, sizeof(command), "rm -rf build/%s", filename);
+  } else {
+    snprintf(command, sizeof(command), "rm -rf build/");
+  }
+
+  printf("Cleaning file(s)...\n");
+  printf("-*-Cmd:-*-\t%s\n", command);
+
+  int result = system(command);
+
+  if (result == 0) {
+    printf("Deletion successful!\n");
+    return 0;
+  } else {
+    fprintf(stderr, "ERROR: Clean failed.\n");
     return 1;
   }
 
@@ -230,6 +279,13 @@ int main(int argc, char **argv) {
 
   case DIRECTIVE_BUILD:
     return build(arg.data.filename);
+
+  case DIRECTIVE_CLEAN:
+    if (!arg.data.all) {
+      return clean(false, arg.data.filename);
+    } else {
+      return clean(true, NULL);
+    }
 
   default:
     fprintf(stderr, "ERROR: Arg not recognised.\n");
