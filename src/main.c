@@ -13,6 +13,7 @@ typedef enum {
   DIRECTIVE_RUN,
   DIRECTIVE_BUILD,
   DIRECTIVE_CLEAN,
+  DIRECTIVE_INIT,
 } Directive;
 
 typedef struct {
@@ -31,7 +32,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.3\nA tool for building CXX projects and running shell commands.\nThis is Open Source Software\n"
+#define VERSION_INFO "again v0.4\nA tool for building CXX projects and running shell commands.\nThis is Open Source Software\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -67,6 +68,11 @@ const char *get_flag(const char *flag) {
     return "clean";
   }
 
+  if (strcmp(flag, "-i") == 0 ||
+      strcmp(flag, "--init") == 0) {
+    return "init";
+  }
+
   return NULL;
 }
 
@@ -80,6 +86,7 @@ void help(const char *message, FILE *stream) {
   print("     -r, --run           -> Runs the next argument as a shell cmd file\n");
   print("     -b, --build         -> Builds the entire directory as a CXX project. NOTE: `build` directory must exist\n");
   print("     -c, --clean         -> Cleans out the build folder. NOTE: `build` directory must exist\n");
+  print("     -i, --init          -> Initialises a folder for a CXX project\n");
   print("\n");
 
   if (message != NULL && *message != '\0') {
@@ -170,6 +177,12 @@ Argument parse_args(int argc, char **argv) {
 	}
       }
     }
+
+    if (strcmp(flag, "init") == 0) {
+      return (Argument) {
+	.directive = DIRECTIVE_INIT
+      };
+    }
   }
     
   return makeError("No valid directive provided.");
@@ -257,6 +270,31 @@ int clean(bool all, const char *filename) {
 
   return 1;
 }
+
+int initialize_dir(void) {
+  char *command = "mkdir src include build";
+  int result = system(command);
+
+  if (result == 0) {
+    printf("Initial directory creation successful!\n");
+  } else {
+    fprintf(stderr, "ERROR: Could not create initial directories.\n");
+    return 1;
+  }
+
+  command = "echo 'int main(void) { return 0\; }' >> src/main.c";
+  result = system(command);
+
+  if (result == 0) {
+    printf("Full initialization successful!\n");
+    return 0;
+  } else {
+    fprintf(stderr, "ERROR: Could not create initial file.\n");
+    return 1;
+  }
+
+  return 1;
+}
  
 int main(int argc, char **argv) {
   Argument arg = parse_args(argc, argv);
@@ -286,6 +324,9 @@ int main(int argc, char **argv) {
     } else {
       return clean(true, NULL);
     }
+
+  case DIRECTIVE_INIT:
+    return initialize_dir();
 
   default:
     fprintf(stderr, "ERROR: Arg not recognised.\n");
