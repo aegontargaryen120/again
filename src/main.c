@@ -29,35 +29,11 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.1\nA tool for automating needless tasks, running shell commands, and writing build recipies\nOpen Source Software\n"
+#define VERSION_INFO "again v0.2\nA tool for automating needless tasks, running shell commands, and writing build recipies\nOpen Source Software\n"
 
 void version(void) {
   printf(VERSION_INFO);
 }
-
-/* char *strip(char *s) { */
-/*   if (s == NULL) { */
-/*     return NULL; */
-/*   } */
-
-/*   while (isspace((unsigned char)*s)) { */
-/*     s++; */
-/*   } */
-
-/*   if (*s == '\0') { */
-/*     return s; */
-/*   } */
-
-/*   char *end = s + strlen(s); */
-
-/*   while (end > s && isspace((unsigned char)end[-1])) { */
-/*     end--; */
-/*   } */
-
-/*   *end = '\0'; */
-
-/*   return s; */
-/* } */
 
 const char *get_flag(const char *flag) {
   if (flag == NULL) {
@@ -79,6 +55,11 @@ const char *get_flag(const char *flag) {
     return "run";
   }
 
+  if (strcmp(flag, "-b") == 0 ||
+      strcmp(flag, "--build") == 0) {
+    return "build";
+  }
+
   return NULL;
 }
 
@@ -90,6 +71,7 @@ void help(const char *message, FILE *stream) {
   print("     -h, --help          -> Prints this help to the terminal\n");
   print("     -v, --version       -> Prints the version information to the terminal\n");
   print("     -r, --run           -> Runs the next argument as a shell cmd file\n");
+  print("     -b, --build         -> Builds the entire directory as a CXX project\n");
   print("\n");
 
   if (message != NULL && *message != '\0') {
@@ -133,7 +115,7 @@ Argument parse_args(int argc, char **argv) {
 
     if (strcmp(flag, "run") == 0) {
       if (i + 1 >= argc) {
-	return makeError("--run requires an input file.");
+	return makeError("Run requires an input file.");
       }
 
       const char *filename = argv[++i];
@@ -147,8 +129,25 @@ Argument parse_args(int argc, char **argv) {
 	.data.filename = filename
       };
     }
-  }
 
+    if (strcmp(flag, "build") == 0) {
+      if (i + 1 >= argc) {
+	return makeError("Build requires an input file.");
+      }
+
+      const char *target = argv[++i];
+
+      if (i != argc - 1) {
+	return makeError("Unexpected additional arguments.");
+      }
+
+      return (Argument) {
+	.directive = DIRECTIVE_BUILD,
+	.data.filename = target
+      };
+    }
+  }
+    
   return makeError("No valid directive provided.");
 }
 
@@ -188,7 +187,28 @@ int run_file(const char *filename) {
 
   return EXIT_FAILURE;
 }
-  
+
+int build(const char *target) {
+  char command[512];
+
+  snprintf(command, sizeof(command), "clang -Wall -Wextra -o %s *.c", target);
+
+  printf("Building C project...\n");
+  printf("-*-Cmd:-*-\t%s\n", command);
+
+  int result = system(command);
+
+  if (result == 0) {
+    printf("Build successful!\n");
+    return 0;
+  } else {
+    fprintf(stderr, "ERROR: Compilation failed.\n");
+    return 1;
+  }
+
+  return 1;
+}
+ 
 int main(int argc, char **argv) {
   Argument arg = parse_args(argc, argv);
 
@@ -209,8 +229,7 @@ int main(int argc, char **argv) {
     return run_file(arg.data.filename);
 
   case DIRECTIVE_BUILD:
-    fprintf(stderr, "Not implemented.\n");
-    return 1;
+    return build(arg.data.filename);
 
   default:
     fprintf(stderr, "ERROR: Arg not recognised.\n");
