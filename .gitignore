@@ -1,2 +1,3 @@
 src/again
-src/build.sh
+src/test
+src/*.sh
