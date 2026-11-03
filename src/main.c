@@ -14,6 +14,7 @@ typedef enum {
   DIRECTIVE_BUILD,
   DIRECTIVE_CLEAN,
   DIRECTIVE_INIT,
+  DIRECTIVE_TEST,
 } Directive;
 
 typedef struct {
@@ -21,6 +22,7 @@ typedef struct {
   union {
     const char *filename;
     const char *error;
+    const char *target;
     bool all;
   } data;
 } Argument;
@@ -32,7 +34,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.4\nA tool for building CXX projects and running shell commands.\nThis is Open Source Software\n"
+#define VERSION_INFO "again v0.5\nA tool for building CXX projects and running shell commands.\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -73,6 +75,11 @@ const char *get_flag(const char *flag) {
     return "init";
   }
 
+  if (strcmp(flag, "-t") == 0 ||
+      strcmp(flag, "--test") == 0) {
+    return "test";
+  }
+
   return NULL;
 }
 
@@ -87,6 +94,7 @@ void help(const char *message, FILE *stream) {
   print("     -b, --build         -> Builds the entire directory as a CXX project. NOTE: `build` directory must exist\n");
   print("     -c, --clean         -> Cleans out the build folder. NOTE: `build` directory must exist\n");
   print("     -i, --init          -> Initialises a folder for a CXX project\n");
+  print("     -t, --test          -> Discovers, compiles, and runs all tests in project `tests` folder.\n");
   print("\n");
 
   if (message != NULL && *message != '\0') {
@@ -172,7 +180,7 @@ Argument parse_args(int argc, char **argv) {
 	} else {
 	  return (Argument) {
 	    .directive = DIRECTIVE_CLEAN,
-	    .data.filename = argv[++i]
+	    .data.target = argv[++i]
 	  };
 	}
       }
@@ -181,6 +189,12 @@ Argument parse_args(int argc, char **argv) {
     if (strcmp(flag, "init") == 0) {
       return (Argument) {
 	.directive = DIRECTIVE_INIT
+      };
+    }
+
+    if (strcmp(flag, "test") == 0) {
+      return (Argument) {
+	.directive = DIRECTIVE_TEST
       };
     }
   }
@@ -228,7 +242,7 @@ int run_file(const char *filename) {
 int build(const char *target) {
   char command[512];
 
-  snprintf(command, sizeof(command), "clang -Wall -Wextra -o build/%s *.c", target);
+  snprintf(command, sizeof(command), "clang -Wall -Wextra -o build/%s src/*.c", target);
 
   printf("Building C project...\n");
   printf("-*-Cmd:-*-\t%s\n", command);
@@ -272,7 +286,7 @@ int clean(bool all, const char *filename) {
 }
 
 int initialize_dir(void) {
-  char *command = "mkdir src include build";
+  char *command = "mkdir -p src include build";
   int result = system(command);
 
   if (result == 0) {
@@ -282,7 +296,7 @@ int initialize_dir(void) {
     return 1;
   }
 
-  command = "echo 'int main(void) { return 0\; }' >> src/main.c";
+  command = "echo 'int main(void) { return 0; }' >> src/main.c";
   result = system(command);
 
   if (result == 0) {
@@ -290,6 +304,41 @@ int initialize_dir(void) {
     return 0;
   } else {
     fprintf(stderr, "ERROR: Could not create initial file.\n");
+    return 1;
+  }
+
+  return 1;
+}
+
+int test_dir(void) {
+  char *command = "find tests/*";
+  int result = system(command);
+
+  if (result == 0) {
+    printf("Tests discovered!\n");
+  } else {
+    fprintf(stderr, "ERROR: No test folder found.\n");
+    return 1;
+  }
+
+  command = "clang -Wall -Wextra tests/*.c -o test";
+  result = system(command);
+
+  if (result == 0) {
+    printf("Compiled tests!\n");
+  } else {
+    fprintf(stderr, "ERROR: Test compilation failed.\n");
+    return 1;
+  }
+
+  command = "./test";
+  result = system(command);
+
+  if (result == 0) {
+    printf("Tests successful!\n");
+    return 0;
+  } else {
+    fprintf(stderr, "ERROR: Tests failed.\n");
     return 1;
   }
 
@@ -320,13 +369,16 @@ int main(int argc, char **argv) {
 
   case DIRECTIVE_CLEAN:
     if (!arg.data.all) {
-      return clean(false, arg.data.filename);
+      return clean(false, arg.data.target);
     } else {
       return clean(true, NULL);
     }
 
   case DIRECTIVE_INIT:
     return initialize_dir();
+
+  case DIRECTIVE_TEST:
+    return test_dir();
 
   default:
     fprintf(stderr, "ERROR: Arg not recognised.\n");
