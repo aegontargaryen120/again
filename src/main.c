@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <dirent.h>
 
 typedef enum {
   DIRECTIVE_ERR,
@@ -15,6 +16,7 @@ typedef enum {
   DIRECTIVE_CLEAN,
   DIRECTIVE_INIT,
   DIRECTIVE_TEST,
+  DIRECTIVE_INFO,
 } Directive;
 
 typedef struct {
@@ -34,7 +36,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.5\nA tool for building CXX projects and running shell commands.\n"
+#define VERSION_INFO "again v0.6\nA tool for building CXX projects and running shell commands.\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -80,6 +82,11 @@ const char *get_flag(const char *flag) {
     return "test";
   }
 
+  if (strcmp(flag, "-I") == 0 ||
+      strcmp(flag, "--info") == 0) {
+    return "info";
+  }
+
   return NULL;
 }
 
@@ -94,7 +101,8 @@ void help(const char *message, FILE *stream) {
   print("     -b, --build         -> Builds the entire directory as a CXX project. NOTE: `build` directory must exist\n");
   print("     -c, --clean         -> Cleans out the build folder. NOTE: `build` directory must exist\n");
   print("     -i, --init          -> Initialises a folder for a CXX project\n");
-  print("     -t, --test          -> Discovers, compiles, and runs all tests in project `tests` folder.\n");
+  print("     -t, --test          -> Discovers, compiles, and runs all tests in project `tests` folder\n");
+  print("     -I, --info          -> Lists all the entries in a directory (argument) in a clean way\n");
   print("\n");
 
   if (message != NULL && *message != '\0') {
@@ -171,19 +179,35 @@ Argument parse_args(int argc, char **argv) {
     }
 
     if (strcmp(flag, "clean") == 0) {
-      if (argc >= i + 1) {
-	if (strcmp(argv[i + 1], "--all") == 0) {
-	  return (Argument) {
-	    .directive = DIRECTIVE_CLEAN,
-	    .data.all = true
-	  };
-	} else {
-	  return (Argument) {
-	    .directive = DIRECTIVE_CLEAN,
-	    .data.target = argv[++i]
-	  };
-	}
+      if (i + 1 >= argc) {
+        return makeError("Clean requires a target or --all.");
       }
+
+      const char *target = argv[++i];
+
+      if (strcmp(target, "--all") == 0) {
+        if (i != argc - 1) {
+	  return makeError("Unexpected additional arguments.");
+        }
+
+        return (Argument) {
+	  .directive = DIRECTIVE_CLEAN,
+	  .data.all = true
+        };
+      }
+
+      if (target[0] == '-') {
+        return makeError("Invalid clean target.");
+      }
+
+      if (i != argc - 1) {
+        return makeError("Unexpected additional arguments.");
+      }
+
+      return (Argument) {
+        .directive = DIRECTIVE_CLEAN,
+        .data.target = target
+      };
     }
 
     if (strcmp(flag, "init") == 0) {
@@ -197,6 +221,24 @@ Argument parse_args(int argc, char **argv) {
 	.directive = DIRECTIVE_TEST
       };
     }
+
+    if (strcmp(flag, "info") == 0) {
+      if (i + 1 >= argc) {
+        return makeError("Info requires a directory path.");
+      }
+
+      const char *path = argv[++i];
+
+      if (i != argc - 1) {
+        return makeError("Unexpected additional arguments.");
+      }
+
+      return (Argument) {
+        .directive = DIRECTIVE_INFO,
+        .data.target = path
+      };
+    }
+
   }
     
   return makeError("No valid directive provided.");
@@ -344,6 +386,44 @@ int test_dir(void) {
 
   return 1;
 }
+
+int display_dir(const char *path) {
+  DIR *dir;
+  struct dirent *entry;
+
+  dir = opendir(path);
+
+  if (dir == NULL) {
+    fprintf(stderr, "ERROR: Could not read directory.\n");
+    return 0;
+  }
+
+  printf("Type\t\tName\n");
+  printf("------------------------\n");
+
+  while ((entry = readdir(dir)) != NULL) {
+    if (entry->d_type == DT_DIR) {
+      printf("[DIR]\t\t%s\n", entry->d_name);
+    } else if (entry->d_type == DT_REG) {
+      printf("[FILE]\t\t%s\n", entry->d_name);
+    } else {
+      printf("[OTHER]\t\t%s\n", entry->d_name);
+    }
+  }
+
+  closedir(dir);
+  return 1;
+}
+
+int project_info(const char *path) {
+  if (!display_dir(path) /* || */
+      /* !display_structure(".") */) {
+    fprintf(stderr, "ERROR: Could not ascertain project structure.\n");
+    return 1;
+  } else {
+    return 0;
+  }
+}
  
 int main(int argc, char **argv) {
   Argument arg = parse_args(argc, argv);
@@ -379,6 +459,9 @@ int main(int argc, char **argv) {
 
   case DIRECTIVE_TEST:
     return test_dir();
+
+  case DIRECTIVE_INFO:
+    return project_info(arg.data.target);
 
   default:
     fprintf(stderr, "ERROR: Arg not recognised.\n");
