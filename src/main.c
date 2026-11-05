@@ -36,7 +36,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.6\nA tool for building CXX projects and running shell commands.\n"
+#define VERSION_INFO "again v0.7\nA tool for building C projects and running shell scripts.\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -98,8 +98,8 @@ void help(const char *message, FILE *stream) {
   print("     -h, --help          -> Prints this help to the terminal\n");
   print("     -v, --version       -> Prints the version information to the terminal\n");
   print("     -r, --run           -> Runs the next argument as a shell cmd file\n");
-  print("     -b, --build         -> Builds the entire directory as a CXX project. NOTE: `build` directory must exist\n");
-  print("     -c, --clean         -> Cleans out the build folder. NOTE: `build` directory must exist\n");
+  print("     -b, --build         -> Builds the entire directory as a CXX project. NOTE: `bin` directory must exist\n");
+  print("     -c, --clean         -> Cleans out the bin folder. NOTE: `bin` directory must exist\n");
   print("     -i, --init          -> Initialises a folder for a CXX project\n");
   print("     -t, --test          -> Discovers, compiles, and runs all tests in project `tests` folder\n");
   print("     -I, --info          -> Lists all the entries in a directory (argument) in a clean way\n");
@@ -284,7 +284,7 @@ int run_file(const char *filename) {
 int build(const char *target) {
   char command[512];
 
-  snprintf(command, sizeof(command), "clang -Wall -Wextra -o build/%s src/*.c", target);
+  snprintf(command, sizeof(command), "clang -Wall -Wextra -o bin/%s src/*.c", target);
 
   printf("Building C project...\n");
   printf("-*-Cmd:-*-\t%s\n", command);
@@ -306,9 +306,9 @@ int clean(bool all, const char *filename) {
   char command[512];
 
   if (!all) {
-    snprintf(command, sizeof(command), "rm -rf build/%s", filename);
+    snprintf(command, sizeof(command), "rm -rf bin/%s", filename);
   } else {
-    snprintf(command, sizeof(command), "rm -rf build/");
+    snprintf(command, sizeof(command), "rm -rf bin/");
   }
 
   printf("Cleaning file(s)...\n");
@@ -328,7 +328,7 @@ int clean(bool all, const char *filename) {
 }
 
 int initialize_dir(void) {
-  char *command = "mkdir -p src include build";
+  char *command = "mkdir -p src include bin";
   int result = system(command);
 
   if (result == 0) {
@@ -468,3 +468,4 @@ int main(int argc, char **argv) {
     return 1;
   }
 }
+int main(void) { return 0; }
