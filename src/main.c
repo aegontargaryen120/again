@@ -17,6 +17,7 @@ typedef enum {
   DIRECTIVE_INIT,
   DIRECTIVE_TEST,
   DIRECTIVE_INFO,
+  DIRECTIVE_EXEC,
 } Directive;
 
 typedef struct {
@@ -36,7 +37,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.7\nA tool for building C projects and running shell scripts.\n"
+#define VERSION_INFO "again v0.8\nA tool for building C projects and running shell scripts.\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -87,6 +88,11 @@ const char *get_flag(const char *flag) {
     return "info";
   }
 
+  if (strcmp(flag, "-e") == 0 ||
+      strcmp(flag, "--exec") == 0) {
+    return "exec";
+  }
+
   return NULL;
 }
 
@@ -103,6 +109,7 @@ void help(const char *message, FILE *stream) {
   print("     -i, --init          -> Initialises a folder for a CXX project\n");
   print("     -t, --test          -> Discovers, compiles, and runs all tests in project `tests` folder\n");
   print("     -I, --info          -> Lists all the entries in a directory (argument) in a clean way\n");
+  print("     -e, --exec          -> Executes a binary from the `bin` folder. NOTE: A compiled binary must exist in the `bin` folder\n");
   print("\n");
 
   if (message != NULL && *message != '\0') {
@@ -239,6 +246,22 @@ Argument parse_args(int argc, char **argv) {
       };
     }
 
+    if (strcmp(flag, "exec") == 0) {
+      if (i + 1 >= argc) {
+	return makeError("Exec requires a bin path.");
+      }
+
+      const char *path = argv[++i];
+
+      if (i != argc - 1) {
+	return makeError("Unexpected additional arguments.");
+      }
+
+      return (Argument) {
+	.directive = DIRECTIVE_EXEC,
+	.data.target = path
+      };
+    }
   }
     
   return makeError("No valid directive provided.");
@@ -424,6 +447,20 @@ int project_info(const char *path) {
     return 0;
   }
 }
+
+int execute_binary_file_from_bin(const char *target) {
+  char command[512];
+  snprintf(command, sizeof(command), "./bin/%s", target);
+
+  int result = system(command);
+  if (result == 0) {
+    printf("Execution successful!\n");
+    return 0;
+  } else {
+    fprintf(stderr, "ERROR: Could not execute binary file\n");
+    return 1;
+  }
+}
  
 int main(int argc, char **argv) {
   Argument arg = parse_args(argc, argv);
@@ -462,6 +499,9 @@ int main(int argc, char **argv) {
 
   case DIRECTIVE_INFO:
     return project_info(arg.data.target);
+
+  case DIRECTIVE_EXEC:
+    return execute_binary_file_from_bin(arg.data.target);
 
   default:
     fprintf(stderr, "ERROR: Arg not recognised.\n");
