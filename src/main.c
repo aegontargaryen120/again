@@ -37,7 +37,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.8\nA tool for building C projects and running shell scripts.\n"
+#define VERSION_INFO "again v0.9\nA tool for building C projects and running shell scripts.\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -331,7 +331,7 @@ int clean(bool all, const char *filename) {
   if (!all) {
     snprintf(command, sizeof(command), "rm -rf bin/%s", filename);
   } else {
-    snprintf(command, sizeof(command), "rm -rf bin/");
+    snprintf(command, sizeof(command), "rm -rf bin/*");
   }
 
   printf("Cleaning file(s)...\n");
