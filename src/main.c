@@ -37,7 +37,7 @@ Argument makeError(const char *message) {
   };
 }
 
-#define VERSION_INFO "again v0.9\nA tool for building C projects and running shell scripts.\n"
+#define VERSION_INFO "again v1.0\n\nAgain is a lightweight command-line utility written in C that simplifies common C/C++ project development tasks. It provides commands to initialize project directories, build and clean binaries, run shell scripts, execute compiled programs, and discover and run tests. It also includes helpful utilities for displaying directory contents and provides version and usage information through a simple command-line interface.\n"
 
 void version(void) {
   printf(VERSION_INFO);
@@ -119,148 +119,154 @@ void help(const char *message, FILE *stream) {
 #undef print
 }
 
-Argument parse_args(int argc, char **argv) {
+Argument parse_args(int argc, char **argv, bool no_args) {
   if (argc < 2) {
-    return makeError("No argument provided.");
+    no_args = true;
+    return (Argument) {
+      .directive = DIRECTIVE_HELP
+    };
   }
 
-  for (int i = 1; i < argc; i++) {
-    const char *flag = get_flag(argv[i]);
+  no_args = false;
+  if (!no_args) {
+    for (int i = 1; i < argc; i++) {
+      const char *flag = get_flag(argv[i]);
 
-    if (flag == NULL) {
-      return makeError("Unknown or malformed flag.");
-    }
-
-    if (strcmp(flag, "help") == 0) {
-      if (argc != 2) {
-	return makeError("Unexpected additional arguments.");
+      if (flag == NULL) {
+	return makeError("Unknown or malformed flag.");
       }
 
-      return (Argument) {
-	.directive = DIRECTIVE_HELP
-      };
-    }
-
-    if (strcmp(flag, "version") == 0) {
-      if (argc != 2) {
-	return makeError("Unexpected additional arguments.");
-      }
-
-      return (Argument) {
-	.directive = DIRECTIVE_VERSION
-      };
-    }
-
-    if (strcmp(flag, "run") == 0) {
-      if (i + 1 >= argc) {
-	return makeError("Run requires an input file.");
-      }
-
-      const char *filename = argv[++i];
-
-      if (i != argc - 1) {
-	return makeError("Unexpected additional arguments.");
-      }
-
-      return (Argument) {
-	.directive = DIRECTIVE_RUN,
-	.data.filename = filename
-      };
-    }
-
-    if (strcmp(flag, "build") == 0) {
-      if (i + 1 >= argc) {
-	return makeError("Build requires an input file.");
-      }
-
-      const char *target = argv[++i];
-
-      if (i != argc - 1) {
-	return makeError("Unexpected additional arguments.");
-      }
-
-      return (Argument) {
-	.directive = DIRECTIVE_BUILD,
-	.data.filename = target
-      };
-    }
-
-    if (strcmp(flag, "clean") == 0) {
-      if (i + 1 >= argc) {
-        return makeError("Clean requires a target or --all.");
-      }
-
-      const char *target = argv[++i];
-
-      if (strcmp(target, "--all") == 0) {
-        if (i != argc - 1) {
+      if (strcmp(flag, "help") == 0) {
+	if (argc != 2) {
 	  return makeError("Unexpected additional arguments.");
-        }
+	}
 
-        return (Argument) {
+	return (Argument) {
+	  .directive = DIRECTIVE_HELP
+	};
+      }
+
+      if (strcmp(flag, "version") == 0) {
+	if (argc != 2) {
+	  return makeError("Unexpected additional arguments.");
+	}
+
+	return (Argument) {
+	  .directive = DIRECTIVE_VERSION
+	};
+      }
+
+      if (strcmp(flag, "run") == 0) {
+	if (i + 1 >= argc) {
+	  return makeError("Run requires an input file.");
+	}
+
+	const char *filename = argv[++i];
+
+	if (i != argc - 1) {
+	  return makeError("Unexpected additional arguments.");
+	}
+
+	return (Argument) {
+	  .directive = DIRECTIVE_RUN,
+	  .data.filename = filename
+	};
+      }
+
+      if (strcmp(flag, "build") == 0) {
+	if (i + 1 >= argc) {
+	  return makeError("Build requires an input file.");
+	}
+
+	const char *target = argv[++i];
+
+	if (i != argc - 1) {
+	  return makeError("Unexpected additional arguments.");
+	}
+
+	return (Argument) {
+	  .directive = DIRECTIVE_BUILD,
+	  .data.filename = target
+	};
+      }
+
+      if (strcmp(flag, "clean") == 0) {
+	if (i + 1 >= argc) {
+	  return makeError("Clean requires a target or --all.");
+	}
+
+	const char *target = argv[++i];
+
+	if (strcmp(target, "--all") == 0) {
+	  if (i != argc - 1) {
+	    return makeError("Unexpected additional arguments.");
+	  }
+
+	  return (Argument) {
+	    .directive = DIRECTIVE_CLEAN,
+	    .data.all = true
+	  };
+	}
+
+	if (target[0] == '-') {
+	  return makeError("Invalid clean target.");
+	}
+
+	if (i != argc - 1) {
+	  return makeError("Unexpected additional arguments.");
+	}
+
+	return (Argument) {
 	  .directive = DIRECTIVE_CLEAN,
-	  .data.all = true
-        };
+	  .data.target = target
+	};
       }
 
-      if (target[0] == '-') {
-        return makeError("Invalid clean target.");
+      if (strcmp(flag, "init") == 0) {
+	return (Argument) {
+	  .directive = DIRECTIVE_INIT
+	};
       }
 
-      if (i != argc - 1) {
-        return makeError("Unexpected additional arguments.");
+      if (strcmp(flag, "test") == 0) {
+	return (Argument) {
+	  .directive = DIRECTIVE_TEST
+	};
       }
 
-      return (Argument) {
-        .directive = DIRECTIVE_CLEAN,
-        .data.target = target
-      };
-    }
+      if (strcmp(flag, "info") == 0) {
+	if (i + 1 >= argc) {
+	  return makeError("Info requires a directory path.");
+	}
 
-    if (strcmp(flag, "init") == 0) {
-      return (Argument) {
-	.directive = DIRECTIVE_INIT
-      };
-    }
+	const char *path = argv[++i];
 
-    if (strcmp(flag, "test") == 0) {
-      return (Argument) {
-	.directive = DIRECTIVE_TEST
-      };
-    }
+	if (i != argc - 1) {
+	  return makeError("Unexpected additional arguments.");
+	}
 
-    if (strcmp(flag, "info") == 0) {
-      if (i + 1 >= argc) {
-        return makeError("Info requires a directory path.");
+	return (Argument) {
+	  .directive = DIRECTIVE_INFO,
+	  .data.target = path
+	};
       }
 
-      const char *path = argv[++i];
+      if (strcmp(flag, "exec") == 0) {
+	if (i + 1 >= argc) {
+	  return makeError("Exec requires a bin path.");
+	}
 
-      if (i != argc - 1) {
-        return makeError("Unexpected additional arguments.");
+	const char *path = argv[++i];
+
+	if (i != argc - 1) {
+	  return makeError("Unexpected additional arguments.");
+	}
+
+	return (Argument) {
+	  .directive = DIRECTIVE_EXEC,
+	  .data.target = path
+	};
       }
-
-      return (Argument) {
-        .directive = DIRECTIVE_INFO,
-        .data.target = path
-      };
-    }
-
-    if (strcmp(flag, "exec") == 0) {
-      if (i + 1 >= argc) {
-	return makeError("Exec requires a bin path.");
-      }
-
-      const char *path = argv[++i];
-
-      if (i != argc - 1) {
-	return makeError("Unexpected additional arguments.");
-      }
-
-      return (Argument) {
-	.directive = DIRECTIVE_EXEC,
-	.data.target = path
-      };
     }
   }
     
@@ -463,11 +469,17 @@ int execute_binary_file_from_bin(const char *target) {
 }
  
 int main(int argc, char **argv) {
-  Argument arg = parse_args(argc, argv);
+  bool error = false;
+  Argument arg = parse_args(argc, argv, error);
 
+  if (error) {
+    help("ERROR: No argument provided.", stderr);
+    return 1;
+  }
+  
   switch (arg.directive) {
   case DIRECTIVE_ERR:
-    fprintf(stderr, "%s\n", arg.data.error);
+    fprintf(stderr, "ERROR: %s\n", arg.data.error);
     return 1;
 
   case DIRECTIVE_HELP:
